@@ -6,9 +6,13 @@ import configuration.Configuration;
 import file.ConfigurationLoader;
 import lombok.extern.java.Log;
 import org.apache.commons.cli.*;
+import serial.LcdData;
+import serial.LcdDataProvider;
 import serial.SerialClient;
 
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
 import java.util.stream.Collectors;
 
 /**
@@ -47,22 +51,29 @@ public class Main {
         final SpotifyApiClient spotifyApiClient = new SpotifyApiClient(configuration);
         final SerialClient serialClient = new SerialClient();
 
-
+        final List<LcdDataProvider> providers = new ArrayList<>();
+        providers.add(spotifyApiClient);
 
         while (true) {
 
-            final CurrentlyPlaying nowPlaying = spotifyApiClient.getNowPlaying();
+            // TODO make this work with multiple providers
 
-            final String currentTrack = nowPlaying.getItem().getName();
-            final String currentArtist = Arrays.stream(nowPlaying.getItem().getArtists()).map(ArtistSimplified::getName).findFirst().orElse("");
-//            final String yearOfRelease = nowPlaying.getProgress_ms()
+            final LcdDataProvider provider = providers.get(0);
+            serialClient.send(toJsonObject(provider.getData()).toString());
 
-            JsonObject a = new JsonObject();
-            a.add("Track", new JsonPrimitive(currentTrack));
-            a.add("Artist", new JsonPrimitive(currentArtist));
-
-            serialClient.send(a.toString());
             Thread.sleep(1500);
         }
+    }
+
+    public static JsonObject toJsonObject(final LcdData lcdData) {
+
+        final JsonObject json = new JsonObject();
+
+        json.add("Track", new JsonPrimitive(lcdData.getLine0()));//.substring(0, Math.min(16, lcdData.getLine0().length()))));
+        json.add("Artist", new JsonPrimitive(lcdData.getLine1()));//.substring(0, Math.min(16, lcdData.getLine1().length()))));
+//        json.add("Album", new JsonPrimitive(lcdData.getLine2()));//.substring(0, Math.min(16, lcdData.getLine2().length()))));
+//        json.add("Line3", new JsonPrimitive(lcdData.getLine3().substring(0, Math.min(16, lcdData.getLine3().length()))));
+
+        return json;
     }
 }

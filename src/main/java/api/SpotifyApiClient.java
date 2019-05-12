@@ -7,11 +7,14 @@ import com.wrapper.spotify.model_objects.miscellaneous.CurrentlyPlaying;
 import com.wrapper.spotify.requests.authorization.authorization_code.AuthorizationCodeRefreshRequest;
 import com.wrapper.spotify.requests.data.player.GetUsersCurrentlyPlayingTrackRequest;
 import configuration.Configuration;
+import serial.LcdData;
+import serial.LcdDataProvider;
 
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.Optional;
 
-public class SpotifyApiClient {
+public class SpotifyApiClient implements LcdDataProvider {
 
     private final SpotifyApi api;
 
@@ -21,6 +24,8 @@ public class SpotifyApiClient {
 
     private AuthorizationCodeRefreshRequest request;
     private AuthorizationCodeCredentials credentials;
+
+    private NowPlayingModel nowPlaying;
 
     public SpotifyApiClient(final Configuration config) {
 
@@ -36,6 +41,8 @@ public class SpotifyApiClient {
 
         this.request = api.authorizationCodeRefresh().build();
         this.credentials = getCredentials();
+
+        this.nowPlaying = null;
     }
 
     private AuthorizationCodeCredentials getCredentials() {
@@ -56,13 +63,14 @@ public class SpotifyApiClient {
         return null;
     }
 
-    public CurrentlyPlaying getNowPlaying() {
+    public boolean updateNowPlaying() {
 
         final String token = credentials.getAccessToken();
 
         api.setAccessToken(token);
         GetUsersCurrentlyPlayingTrackRequest currentlyPlayingTrackRequest = api.getUsersCurrentlyPlayingTrack().build();
         CurrentlyPlaying currentlyPlaying = null;
+
         try {
             currentlyPlaying = currentlyPlayingTrackRequest.execute();
 
@@ -72,6 +80,29 @@ public class SpotifyApiClient {
             e.printStackTrace();
         }
 
-        return currentlyPlaying;
+        final NowPlayingModel nowPlayingRefresh = toNowPlayingModel(currentlyPlaying);
+
+        if (null == nowPlaying || !nowPlaying.equals(nowPlayingRefresh)) {
+            this.nowPlaying = nowPlayingRefresh;
+            return true;
+        } else {
+            return false;
+        }
     }
+
+    private NowPlayingModel toNowPlayingModel(CurrentlyPlaying currentlyPlaying) {
+        return NowPlayingModel.builder()
+                .artist(Arrays.stream(currentlyPlaying.getItem().getArtists()).findFirst().get().getName())
+                .track(currentlyPlaying.getItem().getName())
+                .album(currentlyPlaying.getItem().getAlbum().getName())
+                .build();
+    }
+
+    @Override
+    public LcdData getData() {
+
+        updateNowPlaying();
+        return this.nowPlaying;
+    }
+
 }

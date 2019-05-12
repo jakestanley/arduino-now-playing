@@ -22,7 +22,7 @@ LiquidCrystal_PCF8574 lcd20x4(LCD_ADDRESS);
 String data = "no data";
 StaticJsonBuffer<500> jsonBuffer;
 
-char* line0 = "     NOW PLAYING    ";
+char* line0 = "     NOW PLAYING2   ";
 char* line1 = "     NOW PLAYING    ";
 char* line2 = "     NOW PLAYING    ";
 char* line3 = "     NOW PLAYING    ";
@@ -54,13 +54,20 @@ void loop() {
         line1 = root["Track"];
         line2 = root["Artist"];
         line3 = "";
+        
       }
     } else {
       Serial.print("did not receive any data this time\n");
+      
     }
 
     // realising there's a race condition issue here where there's a bit of a jsonBuffer backlog
+    redraw();
+    delay(1000);
+}
 
+void redraw() {
+  
     lcd20x4.clear();
     lcd20x4.setCursor(0,0);                    // Set cursor at the begining of line 1
     lcd20x4.print(line0);
@@ -70,5 +77,4 @@ void loop() {
     lcd20x4.print(line2);                   // Print print String to LCD on second line
     lcd20x4.setCursor(0,3);                    // Set cursor at the begining of line 4
     lcd20x4.print(line3);                   // Print print String to LCD on second line
-    delay(1000);
 }

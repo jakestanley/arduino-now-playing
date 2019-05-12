@@ -1,5 +1,6 @@
 package serial;
 
+import com.google.gson.JsonObject;
 import gnu.io.CommPortIdentifier;
 import gnu.io.PortInUseException;
 import gnu.io.SerialPort;
@@ -14,10 +15,12 @@ import java.util.Enumeration;
 public class SerialClient {
 
     private SerialPort serialPort;
+    private String lastSent;
 
     public SerialClient() {
 
         CommPortIdentifier port = null;
+        lastSent = null;
 
         Enumeration ports = CommPortIdentifier.getPortIdentifiers();
         while(ports.hasMoreElements()) {
@@ -38,6 +41,12 @@ public class SerialClient {
 
         try {
             serialPort.setSerialPortParams(9600, SerialPort.DATABITS_8, SerialPort.STOPBITS_1, SerialPort.PARITY_NONE);
+            // seems like i need to give arduino some time to sort the serial connection out
+            try {
+                Thread.sleep(2000);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
         } catch (UnsupportedCommOperationException e) {
             e.printStackTrace();
         }
@@ -45,17 +54,21 @@ public class SerialClient {
 
     public void send(final String payload) {
 
+        if (null != lastSent) {
+            if (lastSent.equals(payload)) {
+                return;
+            }
+        }
+
         try {
             OutputStream outputStream = serialPort.getOutputStream();
-            try {
-                Thread.sleep(2000);
-            } catch (InterruptedException e) {
-                e.printStackTrace();
-            }
+
             outputStream.write(payload.getBytes());
 
 //            int response = serialPort.getInputStream().read();
             log.info(String.format("wrote: '%s'", payload));
+            log.info(String.format("sent %d bytes", payload.getBytes().length));
+            lastSent = payload;
 
         } catch (IOException e) {
             e.printStackTrace();
