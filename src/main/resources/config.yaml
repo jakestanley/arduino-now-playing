@@ -1,0 +1,3 @@
+spotify:
+  user: me
+  scope: user-read-currently-playing
