@@ -1,3 +1,4 @@
+import api.LcdDataProviderException;
 import api.SpotifyApiClient;
 import com.google.gson.*;
 import com.wrapper.spotify.model_objects.miscellaneous.CurrentlyPlaying;
@@ -6,6 +7,7 @@ import configuration.Configuration;
 import file.ConfigurationLoader;
 import lombok.extern.java.Log;
 import org.apache.commons.cli.*;
+import org.apache.commons.codec.binary.StringUtils;
 import serial.LcdData;
 import serial.LcdDataProvider;
 import serial.SerialClient;
@@ -49,7 +51,7 @@ public class Main {
         log.info(configuration.toString());
 
         final SpotifyApiClient spotifyApiClient = new SpotifyApiClient(configuration);
-        final SerialClient serialClient = new SerialClient();
+        final SerialClient serialClient = new SerialClient(true);
 
         final List<LcdDataProvider> providers = new ArrayList<>();
         providers.add(spotifyApiClient);
@@ -59,20 +61,33 @@ public class Main {
             // TODO make this work with multiple providers
 
             final LcdDataProvider provider = providers.get(0);
-            serialClient.send(toJsonObject(provider.getData()).toString());
+            try {
+                final LcdData data = provider.getData();
+                serialClient.send(toJsonObject(data, false).toString());
+            } catch (final LcdDataProviderException e) {
+                log.info("LcdDataProviderException thrown");
+            } catch (final NullPointerException n) {
+                log.info(n.getMessage());
+            }
 
-            Thread.sleep(1500);
+            Thread.sleep(3000);
         }
     }
 
-    public static JsonObject toJsonObject(final LcdData lcdData) {
+    public static JsonObject toJsonObject(final LcdData lcdData, final Boolean scrolling) {
+
+//        if (lcdData.getLines() > LcdData.MAX_LINES) {
+//            throw new Exception(); // TODO
+//        }
 
         final JsonObject json = new JsonObject();
 
-        json.add("Track", new JsonPrimitive(lcdData.getLine0()));//.substring(0, Math.min(16, lcdData.getLine0().length()))));
-        json.add("Artist", new JsonPrimitive(lcdData.getLine1()));//.substring(0, Math.min(16, lcdData.getLine1().length()))));
-//        json.add("Album", new JsonPrimitive(lcdData.getLine2()));//.substring(0, Math.min(16, lcdData.getLine2().length()))));
-//        json.add("Line3", new JsonPrimitive(lcdData.getLine3().substring(0, Math.min(16, lcdData.getLine3().length()))));
+        final String[] lines = lcdData.getLines();
+
+        for (int i = 0; i < lines.length; i++) {
+            final String line = scrolling ? lines[i] : lines[i].substring(0,Math.min(lines[i].length(),19));
+            json.add(String.valueOf(i), new JsonPrimitive(line));
+        }
 
         return json;
     }

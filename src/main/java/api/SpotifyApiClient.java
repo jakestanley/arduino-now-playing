@@ -7,13 +7,16 @@ import com.wrapper.spotify.model_objects.miscellaneous.CurrentlyPlaying;
 import com.wrapper.spotify.requests.authorization.authorization_code.AuthorizationCodeRefreshRequest;
 import com.wrapper.spotify.requests.data.player.GetUsersCurrentlyPlayingTrackRequest;
 import configuration.Configuration;
+import lombok.extern.java.Log;
 import serial.LcdData;
 import serial.LcdDataProvider;
 
 import java.io.IOException;
 import java.util.Arrays;
+import java.util.Objects;
 import java.util.Optional;
 
+@Log
 public class SpotifyApiClient implements LcdDataProvider {
 
     private final SpotifyApi api;
@@ -63,30 +66,36 @@ public class SpotifyApiClient implements LcdDataProvider {
         return null;
     }
 
-    public boolean updateNowPlaying() {
+    boolean updateNowPlaying() throws LcdDataProviderException {
+
+        log.info(String
+                .format("Credentials expire in %d", credentials
+                .getExpiresIn()));
+
+        if (credentials.getExpiresIn() < 10) {
+            log.info("refreshing token...");
+            credentials = getCredentials();
+        }
 
         final String token = credentials.getAccessToken();
 
         api.setAccessToken(token);
-        GetUsersCurrentlyPlayingTrackRequest currentlyPlayingTrackRequest = api.getUsersCurrentlyPlayingTrack().build();
-        CurrentlyPlaying currentlyPlaying = null;
+        GetUsersCurrentlyPlayingTrackRequest currentlyPlayingTrackRequest = api
+                .getUsersCurrentlyPlayingTrack().build();
 
         try {
-            currentlyPlaying = currentlyPlayingTrackRequest.execute();
+            final CurrentlyPlaying currentlyPlaying = currentlyPlayingTrackRequest.execute();
+            final NowPlayingModel nowPlayingRefresh = toNowPlayingModel(currentlyPlaying);
 
-        } catch (IOException e) {
-            e.printStackTrace();
-        } catch (SpotifyWebApiException e) {
-            e.printStackTrace();
-        }
-
-        final NowPlayingModel nowPlayingRefresh = toNowPlayingModel(currentlyPlaying);
-
-        if (null == nowPlaying || !nowPlaying.equals(nowPlayingRefresh)) {
-            this.nowPlaying = nowPlayingRefresh;
-            return true;
-        } else {
-            return false;
+            if (null == nowPlaying || !nowPlaying.equals(nowPlayingRefresh)) {
+                this.nowPlaying = nowPlayingRefresh;
+                return true;
+            } else {
+                return false;
+            }
+        } catch (SpotifyWebApiException | IOException s) {
+            s.printStackTrace();
+            throw new LcdDataProviderException();
         }
     }
 
@@ -94,15 +103,20 @@ public class SpotifyApiClient implements LcdDataProvider {
         return NowPlayingModel.builder()
                 .artist(Arrays.stream(currentlyPlaying.getItem().getArtists()).findFirst().get().getName())
                 .track(currentlyPlaying.getItem().getName())
-                .album(currentlyPlaying.getItem().getAlbum().getName())
+                .album(""/*currentlyPlaying.getItem().getAlbum().getName()*/)
+                .state(currentlyPlaying.getIs_playing() ? "" : "||")
                 .build();
     }
 
     @Override
-    public LcdData getData() {
+    public LcdData getData() throws LcdDataProviderException {
 
         updateNowPlaying();
-        return this.nowPlaying;
-    }
 
+        if (Objects.nonNull(this.nowPlaying)) {
+            return this.nowPlaying;
+        } else {
+            return NowPlayingModel.unavailable();
+        }
+    }
 }

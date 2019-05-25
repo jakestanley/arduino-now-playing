@@ -20,7 +20,7 @@ LiquidCrystal_PCF8574 lcd20x4(LCD_ADDRESS);
 
 // data received
 String data = "no data";
-StaticJsonBuffer<500> jsonBuffer;
+StaticJsonBuffer<800> jsonBuffer;
 
 char* line0 = "     NOW PLAYING2   ";
 char* line1 = "     NOW PLAYING    ";
@@ -35,12 +35,13 @@ void setup() {
   lcd20x4.setBacklight(255);
 
   Serial.begin(9600);
+  Serial.setTimeout(2000);
 }
 
 void loop() {
     // put your main code here, to run repeatedly:
 
-
+    // serial buffer can hold up to 64 bytes
     if(Serial.available() > 0) {
       data = Serial.readString();
       jsonBuffer.clear();
@@ -50,11 +51,18 @@ void loop() {
       if (!root.success()) {
         Serial.println("parseObject() failed");
       } else {
-
-        line1 = root["Track"];
-        line2 = root["Artist"];
-        line3 = "";
-        
+        if(root.containsKey("0")) {
+          line1 = root["0"];
+        }
+        if(root.containsKey("1")) {
+          line2 = root["1"];
+        }
+        if(root.containsKey("2")) {
+          line3 = root["2"];
+        }
+//        if(root.containsKey("3")) {
+//          line4 = root["3"];
+//        }       
       }
     } else {
       Serial.print("did not receive any data this time\n");

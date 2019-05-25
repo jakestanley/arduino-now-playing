@@ -1,14 +1,13 @@
 package serial;
 
-import com.google.gson.JsonObject;
 import gnu.io.CommPortIdentifier;
 import gnu.io.PortInUseException;
 import gnu.io.SerialPort;
 import gnu.io.UnsupportedCommOperationException;
 import lombok.extern.java.Log;
+import org.apache.commons.lang3.StringUtils;
 
 import java.io.IOException;
-import java.io.OutputStream;
 import java.util.Enumeration;
 
 @Log
@@ -16,11 +15,13 @@ public class SerialClient {
 
     private SerialPort serialPort;
     private String lastSent;
+    private Boolean chillMode;
 
-    public SerialClient() {
+    public SerialClient(final Boolean chillMode) {
 
         CommPortIdentifier port = null;
-        lastSent = null;
+        this.lastSent = null;
+        this.chillMode = chillMode;
 
         Enumeration ports = CommPortIdentifier.getPortIdentifiers();
         while(ports.hasMoreElements()) {
@@ -54,21 +55,25 @@ public class SerialClient {
 
     public void send(final String payload) {
 
-        if (null != lastSent) {
-            if (lastSent.equals(payload)) {
-                return;
-            }
-        }
+        final String bakedPayload = chillMode ?
+                StringUtils.stripAccents(payload).toLowerCase() : StringUtils.stripAccents(payload);
+
+//        if (null != lastSent) {
+//            if (lastSent.equals(bakedPayload)) {
+//                return;
+//            }
+//        }
 
         try {
-            OutputStream outputStream = serialPort.getOutputStream();
+            final byte[] bytes = bakedPayload.getBytes();
 
-            outputStream.write(payload.getBytes());
+            serialPort.getOutputStream().write(bytes);
 
+//              TODO serial buffer is capped at 64 bytes. need to be more clever.
 //            int response = serialPort.getInputStream().read();
-            log.info(String.format("wrote: '%s'", payload));
-            log.info(String.format("sent %d bytes", payload.getBytes().length));
-            lastSent = payload;
+            log.info(String.format("wrote: '%s'", bakedPayload));
+            log.info(String.format("sent %d bytes", bytes.length));
+            lastSent = bakedPayload;
 
         } catch (IOException e) {
             e.printStackTrace();

@@ -2,6 +2,7 @@ package api;
 
 import lombok.Builder;
 import lombok.EqualsAndHashCode;
+import lombok.NonNull;
 import serial.LcdData;
 
 @Builder
@@ -11,24 +12,16 @@ class NowPlayingModel implements LcdData {
     private String track;
     private String artist;
     private String album;
+    private String state;
 
     @Override
-    public String getLine0() {
-        return track;
+    public String[] getLines() {
+        final String[] lines =  { track, artist, album, state };
+        return lines;
     }
 
-    @Override
-    public String getLine1() {
-        return artist;
-    }
-
-    @Override
-    public String getLine2() {
-        return album;
-    }
-
-    @Override
-    public String getLine3() {
-        return "Spotify";
+    @NonNull
+    public static NowPlayingModel unavailable() {
+        return NowPlayingModel.builder().build();
     }
 }
