@@ -1,14 +1,17 @@
 package serial;
 
+import exception.NoInterfaceFoundException;
 import gnu.io.CommPortIdentifier;
 import gnu.io.PortInUseException;
 import gnu.io.SerialPort;
-import gnu.io.UnsupportedCommOperationException;
+import lombok.Builder;
 import lombok.extern.java.Log;
 import org.apache.commons.lang3.StringUtils;
 
 import java.io.IOException;
-import java.util.Enumeration;
+import java.util.HashSet;
+import java.util.Objects;
+import java.util.Set;
 
 @Log
 public class SerialClient {
@@ -17,20 +20,17 @@ public class SerialClient {
     private String lastSent;
     private Boolean chillMode;
 
-    public SerialClient(final Boolean chillMode) {
+    @Builder
+    public SerialClient(String iface, Boolean chillMode) throws Exception {
 
-        CommPortIdentifier port = null;
+        final CommPortIdentifier port;
         this.lastSent = null;
         this.chillMode = chillMode;
 
-        Enumeration ports = CommPortIdentifier.getPortIdentifiers();
-        while(ports.hasMoreElements()) {
-            CommPortIdentifier currPortId = (CommPortIdentifier) ports.nextElement();
-            if (currPortId.getName().equals("COM3")) {
-                log.info(String.format("Will use port '%s'", currPortId.getName()));
-                port = currPortId;
-                break;
-            }
+        if (Objects.nonNull(iface)) {
+            port = CommPortIdentifier.getPortIdentifier(iface);
+        } else {
+            port = getFreeCommPortIdentifier();
         }
 
         try {
@@ -40,29 +40,27 @@ public class SerialClient {
                     .format("Port '%s' currently in use", port.getName()));
         }
 
-        try {
-            serialPort.setSerialPortParams(9600, SerialPort.DATABITS_8, SerialPort.STOPBITS_1, SerialPort.PARITY_NONE);
-            // seems like i need to give arduino some time to sort the serial connection out
-            try {
-                Thread.sleep(2000);
-            } catch (InterruptedException e) {
-                e.printStackTrace();
-            }
-        } catch (UnsupportedCommOperationException e) {
-            e.printStackTrace();
-        }
+        serialPort.setSerialPortParams(9600, SerialPort.DATABITS_8, SerialPort.STOPBITS_1, SerialPort.PARITY_NONE);
+        // seems like i need to give arduino some time to sort the serial connection out
+        Thread.sleep(2000);
     }
+
+    // TODO lol
+//    public void send(final LcdData data) {
+//
+//        data.getLines()
+//    }
 
     public void send(final String payload) {
 
         final String bakedPayload = chillMode ?
                 StringUtils.stripAccents(payload).toLowerCase() : StringUtils.stripAccents(payload);
 
-//        if (null != lastSent) {
-//            if (lastSent.equals(bakedPayload)) {
-//                return;
-//            }
-//        }
+        if (null != lastSent) {
+            if (lastSent.equals(bakedPayload)) {
+                return;
+            }
+        }
 
         try {
             final byte[] bytes = bakedPayload.getBytes();
@@ -83,5 +81,25 @@ public class SerialClient {
 
     public void close() {
         serialPort.close();
+    }
+
+    /**
+     * @implNote Largely assumes there's only one port you want to use
+     * @return
+     */
+    private static CommPortIdentifier getFreeCommPortIdentifier() throws Exception {
+
+        // making a stream from the ports
+        final Set<CommPortIdentifier> identifiers = new HashSet<>();
+        CommPortIdentifier
+                .getPortIdentifiers()
+                .asIterator()
+                .forEachRemaining(e -> identifiers.add((CommPortIdentifier) e));
+
+        // now stream the set
+        return identifiers.stream()
+                .filter(identifier -> !identifier.isCurrentlyOwned())
+                .findFirst()
+                .orElseThrow(NoInterfaceFoundException::new);
     }
 }

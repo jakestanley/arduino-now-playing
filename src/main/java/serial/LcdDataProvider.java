@@ -1,6 +1,6 @@
 package serial;
 
-import api.LcdDataProviderException;
+import exception.LcdDataProviderException;
 
 public interface LcdDataProvider {
 

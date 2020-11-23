@@ -1,21 +1,20 @@
-import api.LcdDataProviderException;
 import api.SpotifyApiClient;
 import com.google.gson.*;
-import com.wrapper.spotify.model_objects.miscellaneous.CurrentlyPlaying;
-import com.wrapper.spotify.model_objects.specification.ArtistSimplified;
 import configuration.Configuration;
 import file.ConfigurationLoader;
 import lombok.extern.java.Log;
 import org.apache.commons.cli.*;
-import org.apache.commons.codec.binary.StringUtils;
+import org.apache.commons.lang3.StringUtils;
 import serial.LcdData;
 import serial.LcdDataProvider;
 import serial.SerialClient;
 
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.time.format.TextStyle;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
-import java.util.stream.Collectors;
+import java.util.Locale;
 
 /**
  * RXTX binary builds provided as a courtesy of Fizzed, Inc. (http://fizzed.com/).
@@ -25,14 +24,20 @@ import java.util.stream.Collectors;
 public class Main {
 
     public static final int REFRESH_RATE = 1500;
+    public static final String ARG_INTERFACE = "interface";
+    public static final String ARG_SECRETS = "secrets";
+    public static final int SECONDS = 1000;
 
-    public static void main(String[] args) throws InterruptedException {
+    public static void main(String[] args) throws Exception {
 
         // command line parsing from https://stackoverflow.com/a/367714
         final Options options = new Options();
-        final Option secrets = new Option("s", "secrets", true, "path to a yaml file containing secrets");
+        final Option secrets = new Option("s", ARG_SECRETS, true, "path to a yaml file containing secrets");
+        final Option iface = new Option("i", ARG_INTERFACE, true, "interface to use, i.e COM3, COM6");
+
         secrets.setRequired(true);
         options.addOption(secrets);
+        options.addOption(iface);
 
         CommandLineParser parser = new DefaultParser();
         HelpFormatter formatter = new HelpFormatter();
@@ -46,32 +51,47 @@ public class Main {
             System.exit(1);
         }
 
-        final Configuration configuration = ConfigurationLoader.load(cmd.getOptionValue("secrets"));
+
+        final Configuration configuration = ConfigurationLoader.load(cmd.getOptionValue(ARG_SECRETS));
 
         log.info(configuration.toString());
 
         final SpotifyApiClient spotifyApiClient = new SpotifyApiClient(configuration);
-        final SerialClient serialClient = new SerialClient(true);
+        final SerialClient serialClient = SerialClient.builder()
+                .chillMode(false)
+                .iface(cmd.getOptionValue(ARG_INTERFACE)).build();
 
         final List<LcdDataProvider> providers = new ArrayList<>();
         providers.add(spotifyApiClient);
 
-        while (true) {
+        while(true) {
+//            serialClient.send(LocalDateTime.now().format(DateTimeFormatter.ISO_DATE_TIME));
+            LocalDateTime now = LocalDateTime.now();
+            final String dateStr = String.format("%d %s, %d", now.getDayOfMonth(), now.getMonth().getDisplayName(TextStyle.FULL, Locale.ENGLISH), now.getYear());
+            final String timeStr = String.format("%d:%d", now.getHour(), now.getMinute());
 
-            // TODO make this work with multiple providers
-
-            final LcdDataProvider provider = providers.get(0);
-            try {
-                final LcdData data = provider.getData();
-                serialClient.send(toJsonObject(data, false).toString());
-            } catch (final LcdDataProviderException e) {
-                log.info("LcdDataProviderException thrown");
-            } catch (final NullPointerException n) {
-                log.info(n.getMessage());
-            }
-
-            Thread.sleep(3000);
+            serialClient.send(StringUtils.leftPad(StringUtils.rightPad(StringUtils.center(dateStr, 20) + StringUtils.center(timeStr, 20), 60), 20));
+            Thread.sleep(2 * SECONDS);
         }
+
+//        serialClient.send("this string is a string that is in fact eighty characters long. oh jeez rick....");
+
+//        while (true) {
+//
+//            // TODO make this work with multiple providers
+//
+//            final LcdDataProvider provider = providers.get(0);
+//            try {
+//                final LcdData data = provider.getData();
+//                serialClient.send(toJsonObject(data, false).toString());
+//            } catch (final LcdDataProviderException e) {
+//                log.info("LcdDataProviderException thrown");
+//            } catch (final NullPointerException n) {
+//                log.info(n.getMessage());
+//            }
+//
+//            Thread.sleep(3000);
+//        }
     }
 
     public static JsonObject toJsonObject(final LcdData lcdData, final Boolean scrolling) {

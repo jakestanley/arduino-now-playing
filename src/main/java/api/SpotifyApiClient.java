@@ -7,6 +7,7 @@ import com.wrapper.spotify.model_objects.miscellaneous.CurrentlyPlaying;
 import com.wrapper.spotify.requests.authorization.authorization_code.AuthorizationCodeRefreshRequest;
 import com.wrapper.spotify.requests.data.player.GetUsersCurrentlyPlayingTrackRequest;
 import configuration.Configuration;
+import exception.LcdDataProviderException;
 import lombok.extern.java.Log;
 import serial.LcdData;
 import serial.LcdDataProvider;
@@ -70,7 +71,7 @@ public class SpotifyApiClient implements LcdDataProvider {
 
         log.info(String
                 .format("Credentials expire in %d", credentials
-                .getExpiresIn()));
+                        .getExpiresIn()));
 
         if (credentials.getExpiresIn() < 10) {
             log.info("refreshing token...");
